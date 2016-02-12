@@ -50,9 +50,7 @@ def cache(timeout):
         """
         Cashing decorator. It is running multithreaded.
         """
-        tstamp_keys = {}
-        cache = {}
-        lock = Lock()
+        cache = {'tstamp_keys': {}, 'cache': {}, 'lock': Lock()}
 
         def caching(*args, **kwargs):
             """
@@ -60,15 +58,15 @@ def cache(timeout):
             """
             key = hash(repr(args) + repr(kwargs) + repr(function))
             tstamp = time.time()
-            with lock:
+            with cache['lock']:
                 if (
-                        key not in cache or
-                        tstamp - tstamp_keys[key] >= timeout or
+                        key not in cache['cache'] or
+                        tstamp - cache['tstamp_keys'][key] >= timeout or
                         CACHE_DISABLED
                 ):
-                    tstamp_keys[key] = tstamp
-                    cache[key] = function(*args, **kwargs)
-            return cache[key]
+                    cache['tstamp_keys'][key] = tstamp
+                    cache['cache'][key] = function(*args, **kwargs)
+            return cache['cache'][key]
         return caching
     return decorator
 
