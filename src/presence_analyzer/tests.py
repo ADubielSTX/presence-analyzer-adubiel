@@ -8,6 +8,7 @@ import os.path
 import json
 import datetime
 import unittest
+import time
 
 from presence_analyzer import main, utils, views
 
@@ -211,6 +212,33 @@ class PresenceAnalyzerUtilsTestCase(unittest.TestCase):
             datetime.time(9, 39, 5)
         )
 
+    def test_get_data_cache(self):
+        """
+        Test caching function for parsing of CSV file.
+        Checking data is identical.
+        """
+        data = utils.get_data()
+        time.sleep(3)
+        data2 = utils.get_data()
+        self.assertEqual(data, data2)
+
+    def test_get_data_cache_time(self):
+        """
+        Test caching function for parsing of CSV file.
+        Checking if data from cache are prepared faster.
+        """
+        data_time_start = time.time()
+        utils.get_data()
+        data_time_end = time.time()
+        diff_time = data_time_end - data_time_start
+
+        data_time_start2 = time.time()
+        utils.get_data()
+        data_time_end2 = time.time()
+        diff_time2 = data_time_end2 - data_time_start2
+
+        self.assertGreater(diff_time, diff_time2)
+
     def test_get_xml_data(self):
         """
         Test parsing of XML file.
@@ -228,6 +256,7 @@ class PresenceAnalyzerUtilsTestCase(unittest.TestCase):
         """
         Test parsing of CSV file - testing broken data (bad types).
         """
+        utils.CACHE_DISABLED = True
         main.app.config.update({'DATA_CSV': TEST_BROKEN_DATA_CSV})
         data_broken = utils.get_data()
         self.assertEqual(len(data_broken[11]), 5)
@@ -236,6 +265,7 @@ class PresenceAnalyzerUtilsTestCase(unittest.TestCase):
         """
         Test parsing of CSV file - testing broken data (additional column).
         """
+        utils.CACHE_DISABLED = True
         main.app.config.update({'DATA_CSV': TEST_BROKEN_DATA2_CSV})
         data_broken2 = utils.get_data()
         self.assertEqual(len(data_broken2), 0)

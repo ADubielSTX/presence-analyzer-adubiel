@@ -4,18 +4,21 @@ Helper functions used in views.
 """
 
 import csv
+import logging
+import time
 
 from json import dumps
 from functools import wraps
 from datetime import datetime
-
-import logging
-
+from threading import Lock
 from lxml import etree
 from flask import Response
+
 from presence_analyzer.main import app
 
 log = logging.getLogger(__name__)  # pylint: disable=invalid-name
+
+CACHE_DISABLED = False
 
 
 def jsonify(function):
@@ -34,6 +37,43 @@ def jsonify(function):
     return inner
 
 
+def cache(timeout):
+    """
+    Caches data for given time.
+    Args:
+        timeout (time): for how long (in sec) the data has to be cached
+    Returns:
+        Depends on decorated function. Returns cached data or if timeout
+        is expired prepares 'fresh' data.
+    """
+    def decorator(function):
+        """
+        Cashing decorator. It is running multithreaded.
+        """
+        tstamp_keys = {}
+        cache = {}
+        lock = Lock()
+
+        def caching(*args, **kwargs):
+            """
+            Inner caching decorator function.
+            """
+            key = hash(repr(args) + repr(kwargs) + repr(function))
+            tstamp = time.time()
+            with lock:
+                if (
+                        key not in cache or
+                        tstamp - tstamp_keys[key] >= timeout or
+                        CACHE_DISABLED
+                ):
+                    tstamp_keys[key] = tstamp
+                    cache[key] = function(*args, **kwargs)
+            return cache[key]
+        return caching
+    return decorator
+
+
+@cache(30)
 def get_data():
     """
     Extracts presence data from CSV file and groups it by user_id.
@@ -199,7 +239,7 @@ def mean_start_stop(items):
     return result
 
 
-def seconds_since_midnight(time):
+def seconds_since_midnight(time_input):
     """
     Calculates amount of seconds since midnight.
 
@@ -209,7 +249,7 @@ def seconds_since_midnight(time):
     Returns:
         int: calculated time in seconds.
     """
-    return time.hour * 3600 + time.minute * 60 + time.second
+    return time_input.hour * 3600 + time_input.minute * 60 + time_input.second
 
 
 def interval(start, end):
